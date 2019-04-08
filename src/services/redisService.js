@@ -4,6 +4,7 @@ const redisClient = require("./redisClient");
 const channel = "newMessage";
 const zListName = "messages";
 const messageId2Text = "messagesText";
+const locks = "locks"
 
 class redisService{
     constructor(port, ip) {
@@ -49,14 +50,26 @@ class redisService{
     }
 
     async _tryPrintMessage(expiredMessageId) {
-        const fullKey = messageId2Text + ":" + expiredMessageId;
-        const value = await this.client.getSetKey(fullKey, "");
-        this.client.expire(fullKey, 1);
-        if (value !== "") {
-            console.log(value);
-            return this.client.zRem(zListName, expiredMessageId);
+        const ttl = 500;
+        const lockKey = locks + ":" + expiredMessageId;
+        try {
+            const lock = await this.client.lock.lock(lockKey, ttl);
+
+            const fullKey = messageId2Text + ":" + expiredMessageId;
+            const value = await this.client.getKey(fullKey, "");
+            if (value) {
+                console.log(value);
+                await Promise.all([
+                    this.client.zRem(zListName, expiredMessageId),
+                    this.client.delKey(fullKey)
+                ]) 
+            }
+            return lock.unlock();    
         }
-        return Promise.resolve();
+        catch (err){
+            console.error(err);
+            return Promise.reject(err);
+        }
     }
     
     async _setTimerToNextMessage() {

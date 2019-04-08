@@ -1,3 +1,4 @@
+var Redlock = require('redlock');
 const redis = require("redis");
 
 const redisFunctionFactory = (client, func, ...args) => {
@@ -17,12 +18,31 @@ module.exports = class redisClient{
         this.redisClient = redis.createClient(port, ip);
     }
 
+    get lock() {
+        if (!this.redlock){
+            this.redlock = new Redlock(
+                [this.redisClient],
+                {
+                    driftFactor: 0.01, // time in ms
+                    retryCount:  10,
+                    retryDelay:  200, // time in ms
+                    retryJitter:  200 // time in ms
+                }
+            );    
+        }
+        return this.redlock;
+    }
+
     getKey(key) {
         return redisFunctionFactory(this.redisClient, this.redisClient.get, key);
     }
 
     setKey(key, value) {
         return redisFunctionFactory(this.redisClient, this.redisClient.set, key, value);
+    }
+
+    delKey(key) {
+        return redisFunctionFactory(this.redisClient, this.redisClient.del, key);
     }
 
     getSetKey(key, value) {

@@ -18,8 +18,6 @@ const app = express();
 app.use(bodyParser.json());
 app.use('/api', apiRouter({redisService}));
 app.use('/debug', debugRouter({redisService}));
+app.listen(expressPort);
 
-
-redisService.printAllExpiredMessages().then(() => {    
-    app.listen(expressPort);
-})
+redisService.printAllExpiredMessages();
